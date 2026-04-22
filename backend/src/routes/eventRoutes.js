@@ -1,0 +1,10 @@
+'use strict';
+
+const express = require('express');
+const { getEvents } = require('../controllers/eventController');
+
+const router = express.Router();
+
+router.get('/events', getEvents);
+
+module.exports = router;
