@@ -1,16 +1,24 @@
-'use strict';
-
-const express = require('express');
-const { getDevices, addDevice, toggleNetworkSimulation, getDeviceHistory } = require('../controllers/deviceController');
-const { setLifecycleState, getLifecycleHistory } = require('../controllers/lifecycleController');
-
+const express = require("express");
 const router = express.Router();
+const { authenticate, authorize } = require("../middleware/auth");
+const {
+  getAllDevices, getDevice, getDeviceHistory,
+  createDevice, updateDevice, deleteDevice, toggleDevice, heartbeat, getDeviceAudit,
+  getDeviceGraph,
+} = require("../controllers/deviceController");
 
-router.get('/devices', getDevices);
-router.get('/devices/:id/history', getDeviceHistory);
-router.get('/devices/:id/lifecycle/history', getLifecycleHistory);
-router.patch('/devices/:id/lifecycle', setLifecycleState);
-router.post('/add-device', addDevice);
-router.post('/toggle-network-simulation', toggleNetworkSimulation);
+router.use(authenticate);
+
+router.get("/",             getAllDevices);
+router.get("/graph",        getDeviceGraph);
+router.get("/:id",          getDevice);
+router.get("/:id/history",  getDeviceHistory);
+router.get("/:id/audit",    authorize("admin", "operator"), getDeviceAudit);
+
+router.post("/",            authorize("admin"),              createDevice);
+router.patch("/:id",        authorize("admin", "operator"),  updateDevice);
+router.delete("/:id",       authorize("admin"),              deleteDevice);
+router.patch("/:id/toggle", authorize("admin", "operator"),  toggleDevice);
+router.post("/:id/heartbeat", heartbeat);
 
 module.exports = router;

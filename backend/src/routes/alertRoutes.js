@@ -1,13 +1,11 @@
-'use strict';
-
-const express = require('express');
-const { getAlerts, getAlertStats, acknowledgeAlert, resolveAlert } = require('../controllers/alertController');
-
+const express = require("express");
 const router = express.Router();
+const { authenticate, authorize } = require("../middleware/auth");
+const { getAlerts, acknowledgeAlert } = require("../controllers/alertController");
 
-router.get('/alerts',                      getAlerts);
-router.get('/alerts/stats',                getAlertStats);
-router.post('/alerts/:id/acknowledge',     acknowledgeAlert);
-router.post('/alerts/:id/resolve',         resolveAlert);
+router.use(authenticate);
+
+router.get("/", getAlerts);
+router.patch("/:id/acknowledge", authorize("admin", "operator"), acknowledgeAlert);
 
 module.exports = router;

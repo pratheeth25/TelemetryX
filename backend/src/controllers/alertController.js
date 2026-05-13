@@ -1,84 +1,28 @@
-'use strict';
+const Alert = require("../models/Alert");
 
-const AlertService = require('../services/alertService');
-const Alert = require('../models/Alert');
-
-/**
- * GET /api/alerts
- * Query params: state (open|acknowledged|resolved), deviceId, severity
- */
-async function getAlerts(req, res, next) {
+async function getAlerts(req, res) {
   try {
-    const { state, deviceId, severity, limit } = req.query;
-    const filter = {};
-    if (state) filter.state = state;
-    if (deviceId) filter.deviceId = deviceId;
-    if (severity) filter.severity = severity;
-
-    const query = Alert.find(filter)
-      .sort({ triggeredAt: -1 })
-      .limit(Math.min(parseInt(limit, 10) || 200, 500));
-
-    const alerts = await query.lean();
-    res.json({ count: alerts.length, alerts });
+    const houseId = req.user?.houseId;
+    const filter  = houseId ? { houseId } : {};
+    const alerts  = await Alert.find(filter).sort({ createdAt: -1 }).limit(50);
+    res.json(alerts);
   } catch (err) {
-    next(err);
+    res.status(500).json({ error: err.message });
   }
 }
 
-/**
- * GET /api/alerts/stats
- * Returns counts grouped by state and severity.
- */
-async function getAlertStats(req, res, next) {
+async function acknowledgeAlert(req, res) {
   try {
-    const [bySeverity, byState] = await Promise.all([
-      Alert.aggregate([
-        { $match: { state: { $ne: 'resolved' } } },
-        { $group: { _id: '$severity', count: { $sum: 1 } } },
-      ]),
-      Alert.aggregate([
-        { $group: { _id: '$state', count: { $sum: 1 } } },
-      ]),
-    ]);
-
-    const severity = Object.fromEntries(bySeverity.map((r) => [r._id, r.count]));
-    const stateMap = Object.fromEntries(byState.map((r) => [r._id, r.count]));
-
-    res.json({ severity, state: stateMap });
+    const alert = await Alert.findOneAndUpdate(
+      { _id: req.params.id, houseId: req.user.houseId },
+      { acknowledged: true },
+      { new: true }
+    );
+    if (!alert) return res.status(404).json({ error: "Alert not found" });
+    res.json(alert);
   } catch (err) {
-    next(err);
+    res.status(500).json({ error: err.message });
   }
 }
 
-/**
- * POST /api/alerts/:id/acknowledge
- * Body: { acknowledgedBy }
- */
-async function acknowledgeAlert(req, res, next) {
-  try {
-    const { id } = req.params;
-    const { acknowledgedBy = 'user' } = req.body;
-    const alert = await AlertService.acknowledgeAlert(id, String(acknowledgedBy).slice(0, 100));
-    res.json({ alert });
-  } catch (err) {
-    if (err.status) return res.status(err.status).json({ error: err.message });
-    next(err);
-  }
-}
-
-/**
- * POST /api/alerts/:id/resolve
- */
-async function resolveAlert(req, res, next) {
-  try {
-    const { id } = req.params;
-    const alert = await AlertService.resolveAlert(id);
-    res.json({ alert });
-  } catch (err) {
-    if (err.status) return res.status(err.status).json({ error: err.message });
-    next(err);
-  }
-}
-
-module.exports = { getAlerts, getAlertStats, acknowledgeAlert, resolveAlert };
+module.exports = { getAlerts, acknowledgeAlert };

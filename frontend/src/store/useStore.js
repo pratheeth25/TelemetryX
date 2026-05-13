@@ -1,135 +1,86 @@
-import { create } from 'zustand'
+import { create } from "zustand";
 
-/** Maximum temperature readings kept per device */
-const MAX_HISTORY = 25
+const useStore = create((set, get) => ({
+  devices: {},
 
-const useStore = create((set) => ({
-  // ── Socket connection ──────────────────────────────────────
-  connected: false,
-  setConnected: (connected) => set({ connected }),
+  alerts: [],
 
-  // ── Devices ───────────────────────────────────────────────
-  devices: [],
-  setDevices: (devices) => set({ devices }),
-  updateDevice: (updated) =>
-    set((state) => {
-      const idx = state.devices.findIndex((d) => d.deviceId === updated.deviceId)
-      if (idx === -1) return { devices: [...state.devices, updated] }
-      const devices = [...state.devices]
-      devices[idx] = { ...devices[idx], ...updated }
-      return { devices }
-    }),
+  history: {},
 
-  // ── Selected device (for chart + map highlight) ───────────
-  selectedDeviceId: null,
-  setSelectedDeviceId: (id) => set({ selectedDeviceId: id }),
-
-  // ── Temperature history  { [deviceId]: [{time, temp}] } ───
-  temperatureHistory: {},
-  pushTempReading: (deviceId, temperature) =>
-    set((state) => {
-      const prev = state.temperatureHistory[deviceId] || []
-      const entry = {
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-        temp: parseFloat(temperature.toFixed(2)),
-      }
-      const next = [...prev, entry].slice(-MAX_HISTORY)
-      return { temperatureHistory: { ...state.temperatureHistory, [deviceId]: next } }
-    }),
-
-  // ── Events ────────────────────────────────────────────────
-  events: [],
-  setEvents: (events) => set({ events }),
-  addEvent: (event) =>
-    set((state) => ({ events: [event, ...state.events].slice(0, 300) })),
-
-  // ── Event filters ─────────────────────────────────────────
-  eventFilters: { severity: '', type: '' },
-  setEventFilter: (key, value) =>
-    set((state) => ({ eventFilters: { ...state.eventFilters, [key]: value } })),
-
-  // ── Network simulation state ──────────────────────────────
-  networkState: { enabled: false, delayMs: 500, packetLossRate: 0.1 },
-  setNetworkState: (ns) => set({ networkState: ns }),
-
-  // ── Products ──────────────────────────────────────────────
-  products: [],
-  setProducts: (products) => set({ products }),
-
-  // ── Organisations ─────────────────────────────────────────
-  orgs: [],
-  setOrgs: (orgs) => set({ orgs }),
-
-  // ── Active org filter (null = all) ────────────────────────
-  activeOrgId: null,
-  setActiveOrgId: (id) => set({ activeOrgId: id }),
-
-  // ── Active product drill-down (null = product grid) ───────
-  activeProductId: null,
-  setActiveProductId: (id) => set({ activeProductId: id }),
-
-  // ── UI ────────────────────────────────────────────────────
-  darkMode: true,
-  toggleDarkMode: () =>
-    set((state) => {
-      const next = !state.darkMode
-      document.documentElement.classList.toggle('dark', next)
-      return { darkMode: next }
-    }),
-
-  // ── Predictions  { [deviceId]: { failureRisk, predictedFailureTime, reasons, timestamp } }
-  predictions: {},
-  upsertPrediction: (payload) =>
+  updateDevice: (data) =>
     set((state) => ({
-      predictions: {
-        ...state.predictions,
-        [payload.deviceId]: {
-          failureRisk:          payload.failureRisk,
-          predictedFailureTime: payload.predictedFailureTime,
-          reasons:              payload.reasons || [],
-          timestamp:            payload.timestamp,
+      devices: { ...state.devices, [data.deviceId]: data },
+    })),
+
+  setDevices: (deviceArray) => {
+    const map = {};
+    deviceArray.forEach((d) => {
+      map[d.deviceId] = {
+        deviceId: d.deviceId,
+        name: d.name,
+        location: d.location,
+        type: d.type,
+        status: d.status,
+        enabled: d.enabled ?? true,
+        ...d.telemetry,
+      };
+    });
+    set({ devices: map });
+  },
+
+  setAlerts: (alerts) => set({ alerts }),
+
+  addAlerts: (newAlerts) =>
+    set((state) => ({ alerts: [...newAlerts, ...state.alerts].slice(0, 100) })),
+
+  acknowledgeAlert: (id) =>
+    set((state) => ({
+      alerts: state.alerts.map((a) =>
+        a._id === id ? { ...a, acknowledged: true } : a
+      ),
+    })),
+
+  setHistory: (deviceId, data) =>
+    set((state) => ({ history: { ...state.history, [deviceId]: data } })),
+
+  setDeviceEnabled: (deviceId, enabled, status) =>
+    set((state) => ({
+      devices: {
+        ...state.devices,
+        [deviceId]: state.devices[deviceId]
+          ? { ...state.devices[deviceId], enabled, status: status ?? (enabled ? "online" : "offline") }
+          : state.devices[deviceId],
+      },
+    })),
+
+  addDevice: (device) =>
+    set((state) => ({
+      devices: {
+        ...state.devices,
+        [device.deviceId]: {
+          deviceId: device.deviceId,
+          name:     device.name,
+          location: device.location,
+          type:     device.type,
+          status:   device.status,
+          enabled:  device.enabled ?? true,
+          ...(device.telemetry || {}),
         },
       },
     })),
 
-  // ── Alerts  [{ alertId, deviceId, ruleId, severity, state, message, triggeredAt, ... }]
-  alerts: [],
-  setAlerts: (alerts) => set({ alerts }),
-  upsertAlert: (alert) =>
+  removeDevice: (deviceId) =>
     set((state) => {
-      const idx = state.alerts.findIndex((a) => a.alertId === alert.alertId)
-      if (idx === -1) return { alerts: [alert, ...state.alerts].slice(0, 500) }
-      const next = [...state.alerts]
-      next[idx] = { ...next[idx], ...alert }
-      return { alerts: next }
-    }),
-  updateAlertState: (alertId, patch) =>
-    set((state) => ({
-      alerts: state.alerts.map((a) => (a.alertId === alertId ? { ...a, ...patch } : a)),
-    })),
-
-  // ── Lifecycle history  { [deviceId]: [{ fromState, toState, reason, source, timestamp }] }
-  lifecycleHistories: {},
-  setLifecycleHistory: (deviceId, history) =>
-    set((state) => ({ lifecycleHistories: { ...state.lifecycleHistories, [deviceId]: history } })),
-  prependLifecycleEvent: (event) =>
-    set((state) => {
-      const prev = state.lifecycleHistories[event.deviceId] || []
-      return {
-        lifecycleHistories: {
-          ...state.lifecycleHistories,
-          [event.deviceId]: [event, ...prev].slice(0, 200),
-        },
-      }
+      const { [deviceId]: _, ...rest } = state.devices;
+      return { devices: rest };
     }),
 
-  // ── System metrics (polled from /metrics) ─────────────────────────────────
-  systemMetrics: null,
-  setSystemMetrics: (m) => set({ systemMetrics: m }),
+  appendHistory: (deviceId, reading) =>
+    set((state) => {
+      const prev = state.history[deviceId] || [];
+      const next = [...prev, reading].slice(-60);
+      return { history: { ...state.history, [deviceId]: next } };
+    }),
+}));
 
-  // ── Network metrics (from /api/network/status) ────────────────────────────
-  networkMetrics: null,
-  setNetworkMetrics: (m) => set({ networkMetrics: m }),
-}))
-
-export default useStore
+export default useStore;

@@ -1,28 +1,12 @@
-'use strict';
+function errorHandler(err, req, res, _next) {
+  const status  = err.status || err.statusCode || 500;
+  const message = err.message || "Internal server error";
 
-/**
- * Global error-handling middleware.
- * Must be registered LAST in Express (after all routes).
- */
-// eslint-disable-next-line no-unused-vars
-function errorHandler(err, req, res, next) {
-  const status = err.status || err.statusCode || 500;
-  const message = err.message || 'Internal Server Error';
-
-  // Avoid leaking stack traces in production
-  const body = {
-    error: true,
-    status,
-    message,
-  };
-
-  if (process.env.NODE_ENV !== 'production') {
-    body.stack = err.stack;
+  if (process.env.NODE_ENV !== "production") {
+    console.error(`[${req.method} ${req.path}]`, err);
   }
 
-  console.error(`[ErrorHandler] ${status} – ${message}`);
-
-  res.status(status).json(body);
+  res.status(status).json({ error: message });
 }
 
 module.exports = errorHandler;

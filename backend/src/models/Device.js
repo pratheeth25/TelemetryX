@@ -1,93 +1,57 @@
-'use strict';
+﻿const mongoose = require("mongoose");
 
-const mongoose = require('mongoose');
-
-const locationSchema = new mongoose.Schema(
-  {
-    lat: { type: Number, required: true, min: -90, max: 90 },
-    lng: { type: Number, required: true, min: -180, max: 180 },
-  },
-  { _id: false }
-);
+const SMART_DEVICE_TYPES = [
+  "smart_speaker",
+  "smart_lights",
+  "smart_camera",
+  "smart_door_lock",
+  "smart_tv",
+  "robot_vacuum",
+  "smart_doorbell",
+  "smart_refrigerator",
+  "sensor_motion",
+  "sensor_smoke",
+  "sensor_water",
+  "sensor_air",
+];
 
 const deviceSchema = new mongoose.Schema(
   {
-    deviceId: {
+    deviceId: { type: String, required: true, unique: true },
+    name:     { type: String, required: true },
+    location: { type: String, default: "Unknown" },   // room/area within the house
+    type: {
       type: String,
-      required: true,
-      unique: true,
-      trim: true,
-      index: true,
+      enum: SMART_DEVICE_TYPES,
+      default: "smart_speaker",
     },
-    orgId: {
-      type: String,
-      required: true,
-      trim: true,
-      index: true,
-    },
-    productId: {
-      type: String,
-      required: true,
-      trim: true,
-      index: true,
-    },
-    name: {
-      type: String,
-      default: '',
-      trim: true,
-      maxlength: 100,
-    },
-    firmwareVersion: {
-      type: String,
-      default: '1.0.0',
-      trim: true,
-    },
-    healthScore: {
-      type: Number,
-      default: 100,
-      min: 0,
-      max: 100,
-    },
-    healthCategory: {
-      type: String,
-      enum: ['healthy', 'warning', 'critical'],
-      default: 'healthy',
-    },
-    location: {
-      type: locationSchema,
-      required: true,
-    },
-    temperature: {
-      type: Number,
-      default: 25,
-      min: -273.15,
-    },
-    batteryLevel: {
-      type: Number,
-      default: 100,
-      min: 0,
-      max: 100,
-    },
-    status: {
-      type: String,
-      enum: ['online', 'warning', 'critical', 'offline'],
-      default: 'online',
-    },
-    lastSeen: {
-      type: Date,
-      default: Date.now,
-    },
-    /** High-level operational lifecycle of the device */
-    lifecycleState: {
-      type: String,
-      enum: ['ACTIVE', 'INACTIVE', 'MAINTENANCE', 'FAILED'],
-      default: 'ACTIVE',
-      index: true,
+    status:  { type: String, enum: ["online", "offline"], default: "online" },
+    enabled: { type: Boolean, default: true },
+
+    houseId: { type: String, required: true, index: true },
+
+    firmwareVersion: { type: String, default: "1.0.0" },
+    group:           { type: String, default: "default" },
+    lastHeartbeat:   { type: Date,   default: null },
+    registeredBy:    { type: String, default: "system" }, // userId or "system"
+    description:     { type: String, default: "" },
+    tags:            { type: [String], default: [] },
+
+    settings: { type: mongoose.Schema.Types.Mixed, default: {} },
+
+    telemetry: {
+      temperature:    { type: Number, default: 0 },
+      battery:        { type: Number, default: 100 },
+      signalStrength: { type: Number, default: -50 },
+      latency:        { type: Number, default: 10 },
+      packetLoss:     { type: Number, default: 0 },
+      updatedAt:      { type: Date,   default: Date.now },
     },
   },
   { timestamps: true }
 );
 
-deviceSchema.index({ orgId: 1, productId: 1 });
+deviceSchema.index({ name: "text", location: "text", group: "text" });
 
-module.exports = mongoose.model('Device', deviceSchema);
+module.exports = mongoose.model("Device", deviceSchema);
+module.exports.SMART_DEVICE_TYPES = SMART_DEVICE_TYPES;
