@@ -1,4 +1,5 @@
 ﻿# TelemetryX — Smart Home IoT Platform
+Testing Ci/CD pipeline
 
 A full-stack, multi-tenant smart home IoT monitoring platform.  
 Houses are pre-seeded (H001–H100). The first member to register for a house becomes admin; subsequent members join as viewers. Real-time telemetry is driven by a Markov Chain state machine simulator.
