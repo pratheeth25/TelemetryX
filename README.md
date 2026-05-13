@@ -122,6 +122,61 @@ The Vite dev server proxies `/api` and `/socket.io` to `localhost:5000`.
 
 ---
 
+## Production Deployment
+
+### Live Deployment
+
+| Service | URL |
+|---|---|
+| **Frontend** | https://telemetry-f25mvbyqo-pratheethsangari-8638s-projects.vercel.app/ |
+| **Backend API** | https://telemetryx-backend.onrender.com/ |
+
+### Deployment Stack
+
+- **Frontend:** Vercel (with SPA routing via `vercel.json`)
+- **Backend:** Render (Node.js with automatic PORT assignment)
+- **Database:** MongoDB Atlas
+
+### Health Check
+
+```bash
+curl https://telemetryx-backend.onrender.com/health
+```
+
+Expected response:
+```json
+{
+  "status": "ok"
+}
+```
+
+### Environment Configuration
+
+**Render (Backend) env vars:**
+```
+NODE_ENV=production
+CORS_ORIGIN=https://telemetry-f25mvbyqo-pratheethsangari-8638s-projects.vercel.app
+MONGO_URI=<your-mongodb-atlas-uri>
+JWT_ACCESS_SECRET=<your-secret>
+JWT_REFRESH_SECRET=<your-secret>
+```
+
+**Vercel (Frontend) env vars:**
+```
+VITE_API_URL=https://telemetryx-backend.onrender.com/api
+VITE_SOCKET_URL=https://telemetryx-backend.onrender.com
+```
+
+### Key Production Features
+
+- ✅ Cross-origin cookies with `sameSite: "none"` in production
+- ✅ SPA routing fallback to `/index.html`
+- ✅ CORS configured for Vercel frontend
+- ✅ Health endpoint for uptime monitoring
+- ✅ JWT refresh token persistence via HTTP-only cookies
+
+---
+
 ## Environment Variables
 
 ### `backend/.env`
