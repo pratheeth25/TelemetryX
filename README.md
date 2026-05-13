@@ -1,9 +1,7 @@
-# SkyTrack — IoT Monitoring Platform
+﻿# TelemetryX — Smart Home IoT Platform
 
-A full-stack, multi-tenant IoT product monitoring platform built as a portfolio project.
-Simulates 15 pre-configured devices across 3 organisations and 5 products with real-time
-telemetry, anomaly detection, predictive failure, alerting, device lifecycle management,
-satellite-link network simulation, and system observability.
+A full-stack, multi-tenant smart home IoT monitoring platform.  
+Houses are pre-seeded (H001–H100). The first member to register for a house becomes admin; subsequent members join as viewers. Real-time telemetry is driven by a Markov Chain state machine simulator.
 
 ---
 
@@ -12,52 +10,102 @@ satellite-link network simulation, and system observability.
 | Layer | Technology |
 |---|---|
 | Backend | Node.js 20 · Express 4 · Socket.IO 4 |
-| Database | MongoDB 7 · Mongoose 8 |
-| Frontend | React 18 · Vite 5 · Tailwind CSS 3 |
+| Database | MongoDB Atlas (Mongoose 7) |
+| Frontend | React 18 · Vite 4 · Tailwind CSS 3 |
 | State | Zustand 4 |
-| Charts | Recharts |
-| Map | Leaflet + react-leaflet |
+| Charts | Recharts 2 |
+| Containerisation | Docker · Docker Compose · nginx |
 
 ---
 
 ## Project Structure
 
 ```
-lls/
-├── backend/          Express API + Socket.IO server
+TelemetryX/
+├── backend/
 │   ├── src/
-│   │   ├── config/       Seed data, thresholds, DB connection
-│   │   ├── controllers/  Route handlers
-│   │   ├── events/       Internal event bus
-│   │   ├── middleware/   Error handler
-│   │   ├── models/       Mongoose schemas
-│   │   ├── routes/       Express routers
-│   │   ├── services/     Business logic
-│   │   └── tests/        Unit tests
-│   └── server.js         Entry point
-└── frontend/         React + Vite SPA
-    └── src/
-        ├── components/   UI components
-        ├── hooks/        Custom hooks
-        ├── services/     API client
-        └── store/        Zustand store
+│   │   ├── controllers/
+│   │   ├── middleware/
+│   │   ├── models/
+│   │   ├── routes/
+│   │   ├── seeder/
+│   │   ├── services/
+│   │   ├── simulator/
+│   │   └── socket/
+│   ├── .env.example
+│   ├── Dockerfile
+│   └── server.js
+├── frontend/
+│   ├── src/
+│   │   ├── components/
+│   │   ├── hooks/
+│   │   ├── pages/
+│   │   ├── services/
+│   │   └── store/
+│   ├── Dockerfile
+│   └── nginx.conf
+├── docker-compose.yml
+└── README.md
 ```
 
 ---
 
-## Getting Started
+## Running with Docker (recommended)
+
+### Prerequisites
+- Docker ≥ 24
+- Docker Compose ≥ 2.20
+- A MongoDB Atlas cluster (or any MongoDB 7 instance)
+
+### 1. Configure the backend
+
+```bash
+cp backend/.env.example backend/.env
+```
+
+Edit `backend/.env` and set at minimum:
+
+```
+MONGO_URI=mongodb+srv://<user>:<password>@<cluster>.mongodb.net/telemetryx?retryWrites=true&w=majority
+JWT_ACCESS_SECRET=<long-random-string>
+JWT_REFRESH_SECRET=<another-long-random-string>
+CORS_ORIGIN=http://localhost
+```
+
+### 2. Build and start
+
+```bash
+docker compose up --build
+```
+
+| Service | URL |
+|---|---|
+| Frontend (nginx) | http://localhost |
+| Backend API | http://localhost:5000 |
+
+The frontend nginx container proxies `/api/*` and `/socket.io/*` to the backend, so the browser only ever talks to port 80.
+
+### 3. Stop
+
+```bash
+docker compose down
+```
+
+---
+
+## Running Locally (without Docker)
 
 ### Prerequisites
 - Node.js ≥ 20
-- MongoDB running locally on `mongodb://localhost:27017`
+- A MongoDB Atlas URI or local MongoDB instance
 
 ### Backend
 
 ```bash
 cd backend
 npm install
-cp .env.example .env   # configure MONGO_URI, PORT, etc.
-npm start
+cp .env.example .env   # fill in MONGO_URI and JWT secrets
+npm start              # or: npm run dev (nodemon)
 ```
 
 ### Frontend
@@ -68,107 +116,96 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173).
+Open [http://localhost:5173](http://localhost:5173).  
+The Vite dev server proxies `/api` and `/socket.io` to `localhost:5000`.
 
 ---
 
 ## Environment Variables
 
-### backend/.env
+### `backend/.env`
 
 | Variable | Default | Description |
 |---|---|---|
-| `PORT` | `3000` | HTTP server port |
-| `MONGO_URI` | `mongodb://localhost:27017/skytrack` | MongoDB connection string |
-| `CORS_ORIGIN` | `*` | Allowed CORS origin |
-| `THRESHOLD_TEMP_HIGH` | `80` | Warning temperature (°C) |
-| `THRESHOLD_TEMP_CRITICAL` | `95` | Critical temperature (°C) |
-| `THRESHOLD_BATTERY_LOW` | `20` | Warning battery (%) |
-| `THRESHOLD_BATTERY_CRITICAL` | `10` | Critical battery (%) |
-| `THRESHOLD_OFFLINE_MS` | `15000` | Offline timeout (ms) |
-| `NET_DELAY_MIN_MS` | `2000` | Satellite min latency (ms) |
-| `NET_DELAY_MAX_MS` | `10000` | Satellite max latency (ms) |
-| `NET_PACKET_LOSS` | `0.05` | Baseline packet loss rate |
-| `NET_BURST_LOSS` | `0.15` | Burst outage loss rate |
-| `NET_BURST_DURATION_MS` | `4000` | Burst duration (ms) |
-| `NET_BURST_INTERVAL_MS` | `30000` | Burst interval (ms) |
-| `TELEMETRY_TTL_SECONDS` | `604800` | Telemetry TTL (7 days) |
-| `LIFECYCLE_FAILED_STREAK` | `5` | Critical ticks before FAILED |
+| `PORT` | `5000` | HTTP server port |
+| `MONGO_URI` | `mongodb://localhost:27017/telemetryx` | MongoDB connection string |
+| `CORS_ORIGIN` | `http://localhost,http://localhost:5173` | Allowed origins (comma-separated) |
+| `JWT_ACCESS_SECRET` | dev fallback | Sign access tokens — **change in production** |
+| `JWT_REFRESH_SECRET` | dev fallback | Sign refresh tokens — **change in production** |
+| `JWT_ACCESS_EXPIRY` | `15m` | Access token lifetime |
+| `JWT_REFRESH_EXPIRY` | `7d` | Refresh token lifetime |
+| `NODE_ENV` | — | Set to `production` to suppress stack traces |
+
+### Frontend build args (Docker only)
+
+| ARG | Default | Description |
+|---|---|---|
+| `VITE_API_URL` | `/api` | API base path (relative → nginx proxies it) |
+| `VITE_SOCKET_URL` | `http://localhost` | Socket.IO origin (nginx on port 80) |
+
+Override via `docker compose build --build-arg VITE_SOCKET_URL=https://your.domain`.
+
+---
+
+## RBAC
+
+| Role | Capabilities |
+|---|---|
+| `admin` | Full access: manage devices, users, house settings |
+| `operator` | Toggle devices, acknowledge alerts, view analytics |
+| `viewer` | Read-only dashboard and telemetry |
+
+The first member to register for a house is automatically assigned `admin`.
 
 ---
 
 ## API Reference
 
+### Auth
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/auth/houses` | List available houses |
+| POST | `/api/auth/register` | Register (first = admin, rest = viewer) |
+| POST | `/api/auth/login` | Login |
+| POST | `/api/auth/refresh` | Refresh access token (HTTP-only cookie) |
+| POST | `/api/auth/logout` | Logout |
+| GET | `/api/auth/me` | Current user + memberships |
+| PATCH | `/api/auth/me` | Update profile / password |
+
 ### Devices
 | Method | Path | Description |
 |---|---|---|
-| GET | `/api/devices` | All device states |
-| POST | `/api/add-device` | Register a device |
-| GET | `/api/devices/:id/history` | Downsampled telemetry (`?range=1h`) |
-| PATCH | `/api/devices/:id/lifecycle` | Manual lifecycle override |
-| GET | `/api/devices/:id/lifecycle/history` | Lifecycle audit log |
+| GET | `/api/devices` | All devices for current house |
+| POST | `/api/devices` | Create device (admin) |
+| PATCH | `/api/devices/:id` | Update device (admin/operator) |
+| DELETE | `/api/devices/:id` | Delete device (admin) |
+| PATCH | `/api/devices/:id/toggle` | Enable/disable device (admin/operator) |
+| GET | `/api/devices/:id/history` | Telemetry history |
+| GET | `/api/devices/graph` | Connectivity graph data |
 
 ### Alerts
 | Method | Path | Description |
 |---|---|---|
-| GET | `/api/alerts` | List alerts (`?state=open`) |
-| GET | `/api/alerts/stats` | Count by severity / state |
-| POST | `/api/alerts/:id/acknowledge` | Acknowledge an alert |
-| POST | `/api/alerts/:id/resolve` | Resolve an alert |
+| GET | `/api/alerts` | Latest 50 alerts |
+| PATCH | `/api/alerts/:id/acknowledge` | Acknowledge an alert |
 
-### Network Simulation
+### Analytics
 | Method | Path | Description |
 |---|---|---|
-| POST | `/api/toggle-network-simulation` | Toggle + configure |
-| GET | `/api/network/status` | Current status + metrics |
+| GET | `/api/analytics/summary` | Device/alert summary (`?range=24h`) |
+| GET | `/api/analytics/telemetry` | Aggregated telemetry (`?range=24h`) |
+| GET | `/api/analytics/alerts` | Alert breakdown (`?range=24h`) |
+| GET | `/api/analytics/uptime` | Device uptime (`?range=24h`) |
+| GET | `/api/analytics/export/csv` | Export CSV (operator+) |
 
-### Observability
+### House
 | Method | Path | Description |
 |---|---|---|
-| GET | `/metrics` | System metrics (events/s, anomalies/min, heap) |
-
-### Products & Orgs
-| Method | Path | Description |
-|---|---|---|
-| GET | `/api/orgs` | All organisations |
-| GET | `/api/products` | All products |
-| GET | `/api/products/:id/devices` | Devices for a product |
+| GET | `/api/house` | Current house info + member count |
+| PATCH | `/api/house` | Update house name (admin) |
 
 ---
 
-## Features
+## Simulator
 
-- **Real-time simulation** — 15 devices tick every 2–5 s with jittered sensor readings
-- **4-factor health scoring** — temperature 35%, battery 30%, latency 20%, anomaly history 15%
-- **Predictive failure** — 3-signal heuristics (slope, drain rate, missed heartbeats)
-- **Alerting system** — deduplication, auto-resolve, acknowledge, 5 built-in rules
-- **Device lifecycle** — ACTIVE / INACTIVE / MAINTENANCE / FAILED with audit timeline
-- **Satellite network simulation** — variable latency, burst outages, bandwidth cap, message batching
-- **System observability** — events/sec, anomalies/min, heap usage at `/metrics`
-- **Multi-tenant** — 3 orgs, 5 products, product drill-down view
-- **Time-series telemetry** — MongoDB TTL + downsampling, range picker (15m → 7d)
-
----
-
-## Running Tests
-
-```bash
-cd backend
-node src/tests/healthScore.test.js   # 20 tests
-node src/tests/prediction.test.js    # 11 tests
-```
-
----
-
-## Supported Devices (Portfolio)
-
-This platform currently supports **15 pre-configured devices** for demonstration purposes.
-
-| Org | Product | Devices |
-|---|---|---|
-| Nexus Technologies | NX-7 Smart Phone | nx-phone-001 → 003 |
-| Nexus Technologies | NX Pro Laptop | nx-laptop-001 → 003 |
-| Meridian Systems | Meridian Fit Watch | md-watch-001 → 003 |
-| Meridian Systems | Meridian MeshRouter | md-router-001 → 003 |
-| Vertex Innovations | Vertex EnviroSensor | vx-sensor-001 → 003 |
-
+The backend runs a Markov Chain state machine that continuously generates telemetry for all enabled devices. States: `NORMAL → ACTIVE → IDLE → WARNING → CRITICAL → OFFLINE`. Transition matrices are tuned per device type with time-of-day bias and occupancy modelling.

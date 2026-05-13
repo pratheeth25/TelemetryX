@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Sidebar from "./components/Sidebar";
 import RoleGuard from "./components/RoleGuard";
 import Dashboard from "./pages/Dashboard";
@@ -23,6 +23,7 @@ export default function App() {
   const { setDevices, setAlerts } = useStore();
   const { user, accessToken, role, setAuth, clearAuth } = useAuthStore();
 
+
   useEffect(() => {
     if (!accessToken) {
       authApi.refresh()
@@ -45,6 +46,7 @@ export default function App() {
     setPage(p);
     try { localStorage.setItem(PAGE_KEY, p); } catch {}
   }
+
 
   return (
     <div className="flex h-screen bg-gray-950 text-white overflow-hidden">

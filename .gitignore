@@ -40,6 +40,11 @@ desktop.ini
 coverage/
 .nyc_output/
 
+# ── Docker ───────────────────────────────────────────────────────────────────
+docker-compose.override.yml
+docker-compose.*.yml
+!docker-compose.yml
+
 # ── Misc ─────────────────────────────────────────────────────────────────────
 *.tgz
 *.zip
